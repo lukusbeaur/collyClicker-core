@@ -1,10 +1,11 @@
 package Util
 
 import (
-	"collyclicker/internal/fileutils"
 	"encoding/csv"
 	"fmt"
 	"os"
+
+	"github.com/lukusbeaur/collyclicker-core/internal/fileutils"
 )
 
 // Take CSV file, open it. Create new CSV reader. Each URL is sent to sping.go checking for Status 200
