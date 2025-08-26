@@ -2,6 +2,7 @@ package fileutils
 
 import (
 	"encoding/csv"
+	"fmt"
 	"os"
 )
 
@@ -27,7 +28,8 @@ func WriteCSVsingle(file string, links []string) error {
 // WriteLineCSV appends a line to a CSV file
 // it takes a file and a slice of strings ( link ) to write as a new line
 func WriteLineCSV(file string, link []string) error {
-	csvfile, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	outputDir := fmt.Sprint("Output_Data/" + file)
+	csvfile, err := os.OpenFile(outputDir, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
