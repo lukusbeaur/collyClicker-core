@@ -8,15 +8,17 @@ import (
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	cfg "github.com/lukusbeaur/collyclicker-core/app/config"
+	handlers "github.com/lukusbeaur/collyclicker-core/app/handlers"
 	"github.com/lukusbeaur/collyclicker-core/internal/Util"
 	"github.com/lukusbeaur/collyclicker-core/internal/csvparser"
 	"github.com/lukusbeaur/collyclicker-core/internal/fileutils"
-	scraper "github.com/lukusbeaur/collyclicker-core/scrape"
 )
 
 func Run() error {
 	fmt.Println("CollyClicker Application Running")
-
+	//Call the default config function to set the default values
+	cfg := cfg.ConfigDefaults()
 	//--------------Create Colly Collector ----------------
 	// -------------Non Call back functions ----------------
 	c := colly.NewCollector(
@@ -49,12 +51,10 @@ func Run() error {
 	//--------------Colly setup Complete ----------------
 
 	//--------------CSV of URLS to scrape ----------------
-	dirname_ready := "Input_Links/"
-	csvArray, err := fileutils.Findcsvfiles(dirname_ready)
+	csvArray, err := fileutils.Findcsvfiles("") //defaults to Input_Links/
 	if err != nil {
-		Util.Logger.Error("Trouble finding csvs in dirname_ready",
+		Util.Logger.Error("Trouble finding csvs in directory",
 			"Location", "app.go - FindcsvFiles",
-			"dirname_ready", dirname_ready,
 			"Error", err)
 	}
 	// _ = index of csvArray if needed change to for index, record := range csvArray
@@ -63,7 +63,7 @@ func Run() error {
 		//If you want to ping the URLs first, uncomment the next line
 		//Util.CheckURL(record)
 
-		csvfile, err := csvparser.NewCSViter(dirname_ready + record)
+		csvfile, err := csvparser.NewCSViter("", record) //defaults to Input_Links/links.csv if both "".
 		if err != nil {
 			Util.Logger.Error("Trouble opening CSV file and or Iterator",
 				"Location", "app.go - Range csvArray loop",
@@ -74,7 +74,7 @@ func Run() error {
 
 		for {
 			//pageData - creates a slice of county structs to hold the data
-			pageData := []scraper.CountiesOfTheWorld{}
+			pageData := []handlers.CountiesOfTheWorld{}
 			row, _, _, err := csvfile.Next()
 			if errors.Is(err, io.EOF) {
 				fmt.Println("End of CSV file reached")
@@ -89,7 +89,7 @@ func Run() error {
 			}
 			// this gets the first element of the row which is the URL
 			url := row[0]
-			for _, h := range scraper.GetSelectorHandlers(&pageData) {
+			for _, h := range handlers.GetSelectorHandlers(&pageData) {
 				//on HTML calls the handler function for each selector
 				c.OnHTML(h.Selector, func(e *colly.HTMLElement) { h.Handler(e) })
 				c.OnScraped(func(r *colly.Response) {
