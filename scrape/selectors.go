@@ -1,56 +1,74 @@
+// scrape/selectors.go
 package scraper
 
 import (
 	"log/slog"
 
+	"github.com/gocolly/colly/v2"
+	appcfg "github.com/lukusbeaur/collyclicker-core/app/config"
 	"github.com/lukusbeaur/collyclicker-core/internal/Util"
-
-	colly "github.com/gocolly/colly/v2"
 )
 
-// ScraperConfig holds configuration for CollyScraper,
-// including the Colly collector, proxy options, and a CSS selector.
-type ScraperConfig struct {
-	Collector     *colly.Collector  // A pointer to Colly's collector object (created via colly.NewCollector()).
-	UseProxy      bool              // Whether or not to use a proxy.
-	ProxyList     []string          // List of proxy addresses to rotate through.
-	LinkSelectors []SelectorHandler // CSS selector for the target HTML element(s).
-	Debug         bool              // Enables optional debug logging.
-}
-
-// CollyScraper encapsulates a configured Colly collector.
-type CollyScraper struct {
-	Config *ScraperConfig
-}
-
-// Input all HTML elements at once, defining the link handlers up front
-// 1 Scrape multiple elements
 type SelectorHandler struct {
 	Name     string
 	Selector string
 	Handler  func(e *colly.HTMLElement)
 }
 
-// NewCollyScraper is a constructor that accepts a fully prepared ScraperConfig.
-// Example usage:
-// cfg := &ScraperConfig{Collector: colly.NewCollector(), ...}
-// s := scraper.NewCollyScraper(cfg)
-func NewCollyScraper(cfg *ScraperConfig) *CollyScraper {
-	Util.Logger.Debug("Calling New CollyScraper",
-		slog.String("Functions", "scraper.go - NewCollyScrapper"))
-	for _, sh := range cfg.LinkSelectors {
-		cfg.Collector.OnHTML(sh.Selector, sh.Handler)
+// Adapter: build a colly.Collector from the *app* config.
+// - handlers: the []SelectorHandler you got from app/handlers
+// - collector: pass nil to build from cfg; pass a prebuilt collector to reuse it
+func NewCollectorFromAppConfig(cfg *appcfg.Config, handlers []SelectorHandler, collector *colly.Collector) *colly.Collector {
+	if cfg == nil {
+		cfg = appcfg.DefaultConfig()
 	}
-	return &CollyScraper{
-		Config: cfg,
+
+	c := collector
+	if c == nil {
+		c = colly.NewCollector(
+			colly.AllowedDomains(cfg.AllowedDomains...),
+			colly.Async(cfg.Async),
+			colly.UserAgent(cfg.UserAgent),
+		)
+
+		c.Limit(&colly.LimitRule{
+			DomainGlob:  "*",
+			Parallelism: cfg.Parallelism,
+			Delay:       cfg.Delay,
+			RandomDelay: cfg.RandomDelay,
+		})
+		c.IgnoreRobotsTxt = cfg.IgnoreRobots
+		c.AllowURLRevisit = cfg.AllowRevisit
+
+		c.OnRequest(func(r *colly.Request) {
+			for k, v := range cfg.DefaultHeaders {
+				r.Headers.Set(k, v)
+			}
+		})
+
+		if cfg.UseProxy && len(cfg.ProxyList) > 0 {
+			if err := c.SetProxy(cfg.ProxyList[0]); err != nil && cfg.Debug {
+				Util.Logger.Warn("Proxy set failed",
+					slog.String("proxy", cfg.ProxyList[0]),
+					slog.Any("err", err))
+			}
+		}
+
+		c.OnError(func(r *colly.Response, err error) {
+			if cfg.Debug {
+				Util.Logger.Error("Request failed",
+					slog.String("url", r.Request.URL.String()),
+					slog.Int("status", r.StatusCode),
+					slog.Any("err", err))
+			}
+		})
 	}
-}
 
-// Scrape visits the provided URL and applies the user supplied handler
-// to each element matching the LinkSelector.
-func (s *CollyScraper) Scrape(url string) error {
-	err := s.Config.Collector.Visit(url)
-	s.Config.Collector.Wait()
+	// Register handlers
+	for _, h := range handlers {
+		hLocal := h
+		c.OnHTML(hLocal.Selector, func(e *colly.HTMLElement) { hLocal.Handler(e) })
+	}
 
-	return err
+	return c
 }

@@ -15,8 +15,9 @@ type csvIter struct {
 }
 
 // Opens CSV, and returns Iterator (CSV.NewReader)
-func NewCSViter(path string) (*csvIter, error) {
-	f, err := os.Open(path)
+func NewCSViter(path string, record string) (*csvIter, error) {
+	dir := path + record
+	f, err := os.Open(dir)
 	if err != nil {
 		//log.Fatalf("Error opening file %v", path)
 		return nil, err

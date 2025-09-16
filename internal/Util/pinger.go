@@ -34,11 +34,11 @@ func CheckURL(file string) {
 		} else if code == 200 {
 			fmt.Printf("Code:%d \n Link: %s\n", code, row)
 			//fail = append(pass, row)
-			fileutils.WriteLineCSV("links/scrapeReady/pass_CSV.csv", []string{row})
+			fileutils.WriteLineCSV("Input_links", "pass_CSV.csv", []string{row})
 		} else {
 			fmt.Printf("Code:%d \n Link: %s\n", code, row)
 			//pass = append(fail, row)
-			fileutils.WriteLineCSV("links/fail_CSV.csv", []string{row})
+			fileutils.WriteLineCSV("Input_links/", "Failedping.csv", []string{row})
 		}
 	}
 }

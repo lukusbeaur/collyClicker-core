@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/gocolly/colly/v2"
+	appparams "github.com/lukusbeaur/collyclicker-core/app/config"
+	handlers "github.com/lukusbeaur/collyclicker-core/app/handlers"
 	"github.com/lukusbeaur/collyclicker-core/internal/Util"
 	"github.com/lukusbeaur/collyclicker-core/internal/csvparser"
 	"github.com/lukusbeaur/collyclicker-core/internal/fileutils"
@@ -16,66 +17,61 @@ import (
 
 func Run() error {
 	fmt.Println("CollyClicker Application Running")
+	//Call the default config function to set the default values
+	cfg := appparams.DefaultConfig()
 
-	//--------------Create Colly Collector ----------------
-	// -------------Non Call back functions ----------------
-	c := colly.NewCollector(
-		colly.AllowedDomains("scrapethissite.com", "www.scrapethissite.com"),
-		colly.Async(false),
-		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"),
-	)
+	// -------------handler selection -----------------
+	var pageData []handlers.CountiesOfTheWorld
+	selectorList := handlers.GetSelectorHandlers(&pageData)
 
-	c.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		Parallelism: 1,
-		Delay:       2 * time.Second, // min
-		RandomDelay: 4 * time.Second, // extra random
-	})
-	// Dont ignore robot.txt but allow domain revisiting
-	c.IgnoreRobotsTxt = false
-	c.AllowURLRevisit = true
+	// -------------Create Colly Collector -----------------
+	c := scraper.NewCollectorFromAppConfig(cfg, selectorList, nil)
+
 	//--------------Call back functions ----------------
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("Referer", "https://scrapethissite.com")
 		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
 	})
-	//temporary debugging on failed requests.
+	//temporary debugging on failed requests. once I add logging back this will change
 	c.OnError(func(r *colly.Response, err error) {
 		fmt.Printf("Request URL: %s\n", r.Request.URL)
 		fmt.Printf("Status Code: %d\n", r.StatusCode)
 		fmt.Printf("Error: %v\n", err)
 	})
 
+	c.OnScraped(func(r *colly.Response) {
+		for _, it := range pageData {
+			_ = fileutils.WriteLineCSV("countries.csv", cfg.OutputDir, []string{it.Country})
+		}
+	})
 	//--------------Colly setup Complete ----------------
 
 	//--------------CSV of URLS to scrape ----------------
-	dirname_ready := "Input_Links/"
-	csvArray, err := fileutils.Findcsvfiles(dirname_ready)
+	files, err := fileutils.Findcsvfiles(cfg.InputDir)
 	if err != nil {
-		Util.Logger.Error("Trouble finding csvs in dirname_ready",
+		Util.Logger.Error("Trouble finding csvs in directory",
 			"Location", "app.go - FindcsvFiles",
-			"dirname_ready", dirname_ready,
 			"Error", err)
 	}
 	// _ = index of csvArray if needed change to for index, record := range csvArray
-	for _, record := range csvArray {
+	for _, record := range files {
 		fmt.Println("Processing file:", record)
 		//If you want to ping the URLs first, uncomment the next line
 		//Util.CheckURL(record)
 
-		csvfile, err := csvparser.NewCSViter(dirname_ready + record)
+		iter, err := csvparser.NewCSViter(cfg.InputDir, record)
 		if err != nil {
 			Util.Logger.Error("Trouble opening CSV file and or Iterator",
 				"Location", "app.go - Range csvArray loop",
 				"Record", record,
 				"Error", err)
 		}
-		defer csvfile.Close()
+		defer iter.Close()
 
 		for {
 			//pageData - creates a slice of county structs to hold the data
-			pageData := []scraper.CountiesOfTheWorld{}
-			row, _, _, err := csvfile.Next()
+			pageData := []handlers.CountiesOfTheWorld{}
+			row, _, _, err := iter.Next()
 			if errors.Is(err, io.EOF) {
 				fmt.Println("End of CSV file reached")
 				break
@@ -88,28 +84,13 @@ func Run() error {
 				continue
 			}
 			// this gets the first element of the row which is the URL
-			url := row[0]
-			for _, h := range scraper.GetSelectorHandlers(&pageData) {
-				//on HTML calls the handler function for each selector
-				c.OnHTML(h.Selector, func(e *colly.HTMLElement) { h.Handler(e) })
-				c.OnScraped(func(r *colly.Response) {
-					fmt.Println("Finished", r.Request.URL)
-
-					for _, it := range pageData {
-						fmt.Printf("Country: %s\n", it.Country)
-						//The example uses h.name which is the handler name you will assign in /scrape/handlers.go
-						//this will default and save to Output_Data/
-						fileutils.WriteLineCSV(h.Name+".csv", []string{it.Country})
-					}
-
-				})
-			}
-			if err := c.Visit(url); err != nil {
-				fmt.Println("Error visiting URL:", err)
+			pageData = pageData[:0]
+			if err := c.Visit(row[0]); err != nil {
+				fmt.Println("Visit:", err)
 				continue
 			}
 		}
-		c.Wait()
 	}
+	c.Wait()
 	return nil
 }

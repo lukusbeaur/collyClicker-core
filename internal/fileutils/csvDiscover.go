@@ -12,6 +12,7 @@ import (
 
 // Open the specified directory and search for all csv files
 // isDir is used to passover directorys/ folders, and the has suffix checks for csvs
+// default to Input_Links
 func Findcsvfiles(path string) ([]string, error) {
 	//does a CSV file exist at the path)
 	csvLists := []string{}
@@ -19,8 +20,9 @@ func Findcsvfiles(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	for _, entry := range entries {
-		if !(entry.IsDir()) && strings.HasSuffix(entry.Name(), ".csv") {
+		if !(entry.IsDir()) && strings.HasSuffix(strings.ToLower(entry.Name()), ".csv") {
 			csvLists = append(csvLists, entry.Name())
 		}
 
