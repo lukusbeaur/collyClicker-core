@@ -15,12 +15,6 @@ import (
 // default to Input_Links
 func Findcsvfiles(path string) ([]string, error) {
 	//does a CSV file exist at the path)
-
-	if strings.TrimSpace(path) == "" {
-		dir := "Input_Links/"
-		path = dir
-	}
-
 	csvLists := []string{}
 	entries, err := os.ReadDir(path)
 	if err != nil {

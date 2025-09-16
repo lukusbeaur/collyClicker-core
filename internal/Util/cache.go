@@ -98,6 +98,6 @@ func TruncateTmpFile(tc TrackCache) error {
 }
 
 func AddToRetryCache(file string, url string) error {
-	retryPath := "scrapeReady/retryCache.csv"
-	return fileutils.WriteLineCSV(retryPath, []string{file, url})
+	retryPath := "Input_Links/"
+	return fileutils.WriteLineCSV("retryCache.csv", retryPath, []string{file, url})
 }

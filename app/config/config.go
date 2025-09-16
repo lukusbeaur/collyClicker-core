@@ -1,14 +1,12 @@
-// internal/config/config.go
+// app/config/config.go
 package config
 
 import "time"
 
 type Config struct {
-	// File/directories
 	InputDir  string
 	OutputDir string
 
-	// Colly
 	AllowedDomains []string
 	Async          bool
 	UserAgent      string
@@ -18,11 +16,15 @@ type Config struct {
 	IgnoreRobots   bool
 	AllowRevisit   bool
 
-	// HTTP headers
 	DefaultHeaders map[string]string
+
+	// Optional: proxy/debug if you want users to control them too
+	UseProxy  bool
+	ProxyList []string
+	Debug     bool
 }
 
-func defaultConfig() *Config {
+func DefaultConfig() *Config {
 	return &Config{
 		InputDir:       "Input_Links/",
 		OutputDir:      "Output_Data/",

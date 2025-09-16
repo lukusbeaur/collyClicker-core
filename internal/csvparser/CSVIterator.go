@@ -16,13 +16,6 @@ type csvIter struct {
 
 // Opens CSV, and returns Iterator (CSV.NewReader)
 func NewCSViter(path string, record string) (*csvIter, error) {
-	//will default to Input_Links/links.csv
-	if path == "" {
-		path = "Input_Links/"
-	}
-	if record == "" {
-		record = "links.csv"
-	}
 	dir := path + record
 	f, err := os.Open(dir)
 	if err != nil {
